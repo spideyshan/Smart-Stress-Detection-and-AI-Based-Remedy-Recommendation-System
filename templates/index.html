@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Stress Detection</title>
+  <style>
+    :root{ --bg:#0f1724; --muted:#9aa8bf; --accent:#60a5fa; }
+    body{ background:linear-gradient(180deg,#07102a,#021026); font-family: Inter, Arial, sans-serif; color: #e6eef8; margin: 24px; text-align: center; }
+    h1{ margin-bottom:6px; font-weight:700; }
+    .grid{ display:flex; flex-wrap:wrap; justify-content:center; gap:18px; margin-top:18px; }
+    .card{ background: rgba(255,255,255,0.03); padding:18px; width:320px; border-radius:12px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); text-align:left; }
+    .user-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .user-row h2{ margin:0; font-size:18px; }
+    .stat{ font-size:14px; color:var(--muted); margin:6px 0; }
+    .state{ font-weight:600; font-size:16px; display:inline-block; padding:6px 10px; border-radius:10px; background: rgba(255,255,255,0.02); }
+    .buttons{ display:flex; gap:8px; margin-top:12px; }
+    button{ background:var(--accent); color:#042033; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:600; }
+    button.ghost{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.04); }
+    pre.remedy{ white-space:pre-wrap; margin-top:10px; background: rgba(255,255,255,0.02); padding:10px; border-radius:8px; font-size:14px; color:#dcefff; }
+    .tiny{ font-size:12px; color:var(--muted); margin-top:6px; }
+  </style>
+</head>
+<body>
+  <h1>Smart Stress Detection Dashboard</h1>
+  <p class="tiny">Sensor data updates every 7s. AI remedies auto-refresh every 20s.</p>
+
+  <div id="grid" class="grid">
+    {% if users %}
+      {% for user, data in users.items() %}
+        <div class="card" id="card-{{ user }}" data-user="{{ user }}">
+          <div class="user-row">
+            <h2>{{ user }}</h2>
+            <span class="state" id="state-{{ user }}">{{ data.state }}</span>
+          </div>
+          <div class="stat">BPM: <strong id="bpm-{{ user }}">{{ data.bpm }}</strong></div>
+          <div class="stat">Temp: <strong id="temp-{{ user }}">{{ data.temp }}</strong> °C</div>
+          <div class="stat tiny">Last BPM ts: <span id="ts_bpm-{{ user }}">{{ data.ts_bpm }}</span></div>
+          <div class="stat tiny">Last Temp ts: <span id="ts_temp-{{ user }}">{{ data.ts_temp }}</span></div>
+
+          <div class="buttons">
+            <button onclick="getRemedy('{{ user }}', this)">Get Remedy</button>
+            <button class="ghost" onclick="refreshNow()">Refresh now</button>
+            <button class="ghost" onclick="copyRemedy('{{ user }}')">Copy remedy</button>
+          </div>
+
+          <div id="remedy-{{ user }}">
+            {% if data.remedy %}
+              <pre class="remedy">{{ data.remedy }}</pre>
+            {% else %}
+              <div class="tiny">No remedy yet.</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card"><p>No data yet.</p></div>
+    {% endif %}
+  </div>
+
+<script>
+  // Auto-intervals (milliseconds)
+  const AUTO_REFRESH_INTERVAL_MS = 7000;  // auto-refresh sensor data every 7 seconds
+  // AUTO-REMEDY_INTERVAL_MS = 20000  // ORIGINAL 20 seconds  <-- **HIGHLIGHTED** (this is the line you asked to spot)
+  const AUTO_REMEDY_INTERVAL_MS = 20000; // auto-request AI remedy every 20 seconds
+
+  async function fetchLatestAll() {
+    try {
+      const res = await fetch('/latest_all');
+      if (!res.ok) return;
+      const data = await res.json();
+      // Update DOM for each user present in the response
+      for (const [user, udata] of Object.entries(data)) {
+        const bpmEl = document.getElementById('bpm-' + user);
+        const tempEl = document.getElementById('temp-' + user);
+        const stateEl = document.getElementById('state-' + user);
+        const tsBpmEl = document.getElementById('ts_bpm-' + user);
+        const tsTempEl = document.getElementById('ts_temp-' + user);
+        if (bpmEl) bpmEl.textContent = udata.bpm ?? '-';
+        if (tempEl) tempEl.textContent = udata.temp ?? '-';
+        if (stateEl) stateEl.textContent = udata.state ?? 'Unknown';
+        if (tsBpmEl) tsBpmEl.textContent = udata.ts_bpm ?? '-';
+        if (tsTempEl) tsTempEl.textContent = udata.ts_temp ?? '-';
+        // keep any existing remedy DOM text (remedy will be updated by autoRemedy)
+      }
+    } catch (e) {
+      console.warn('fetchLatestAll failed', e);
+    }
+  }
+
+  async function getRemedy(userId, btn = null) {
+    if (btn) { btn.disabled = true; btn.textContent = "Thinking..."; }
+    try {
+      const resp = await fetch('/remedy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({user_id: userId})
+      });
+      const j = await resp.json();
+      if (j.ok) {
+        const div = document.getElementById('remedy-' + userId);
+        div.innerHTML = '<pre class="remedy">' + (j.remedy || 'No suggestion') + '</pre>';
+      } else {
+        console.warn('Remedy error', j);
+      }
+    } catch (e) {
+      console.warn('Remedy request failed', e);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Get Remedy"; }
+    }
+  }
+
+  function refreshNow() {
+    fetchLatestAll();
+  }
+
+  function copyRemedy(userId) {
+    const div = document.getElementById('remedy-' + userId);
+    const text = div ? (div.innerText || '') : '';
+    if (!text) { alert('No remedy to copy'); return; }
+    navigator.clipboard?.writeText(text).then(()=> alert('Copied!'), ()=> alert('Copy failed'));
+  }
+
+  async function autoRemedyAll() {
+    // For all current cards in the DOM, request a remedy (server caches within 20s)
+    const cards = document.querySelectorAll('[data-user]');
+    for (const c of cards) {
+      const userId = c.getAttribute('data-user');
+      // Note: we do not await sequentially to avoid long blocking; fire-and-forget each promise
+      getRemedy(userId);
+    }
+  }
+
+  // Initial load
+  fetchLatestAll();
+
+  // Set intervals
+  setInterval(fetchLatestAll, AUTO_REFRESH_INTERVAL_MS);
+  setInterval(autoRemedyAll, AUTO_REMEDY_INTERVAL_MS); // <- auto-remedy every 20 seconds (original target)
+
+  // Also run an immediate autoRemedy shortly after load
+  setTimeout(autoRemedyAll, 1500);
+</script>
+</body>
+</html>
