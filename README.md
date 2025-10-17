@@ -46,23 +46,6 @@ Copy code
 ✅ JSON API endpoints for developers  
 ✅ Simple to deploy on macOS/Linux/Windows  
 
----
-
-## 🧩 Project Structure
-
-smart_stress/
-├── app.py # Flask backend with AI integration
-├── templates/
-│ └── index.html # Web dashboard UI
-├── static/ # (optional) Static assets like CSS/images
-├── a_pulse/
-│ └── a_pulse.ino # NodeMCU sketch for heart rate (pulse)
-├── b_temp/
-│ └── b_temp.ino # NodeMCU sketch for temperature
-└── README.md # Project documentation
-
-yaml
-Copy code
 
 ---
 
