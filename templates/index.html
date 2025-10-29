@@ -34,13 +34,13 @@
           </div>
           <div class="stat">BPM: <strong id="bpm-{{ user }}">{{ data.bpm }}</strong></div>
           <div class="stat">Temp: <strong id="temp-{{ user }}">{{ data.temp }}</strong> °C</div>
-          <div class="stat tiny">Last BPM ts: <span id="ts_bpm-{{ user }}">{{ data.ts_bpm }}</span></div>
-          <div class="stat tiny">Last Temp ts: <span id="ts_temp-{{ user }}">{{ data.ts_temp }}</span></div>
+          <!-- <div class="stat tiny">Last BPM ts: <span id="ts_bpm-{{ user }}">{{ data.ts_bpm }}</span></div>
+          <div class="stat tiny">Last Temp ts: <span id="ts_temp-{{ user }}">{{ data.ts_temp }}</span></div> -->
 
           <div class="buttons">
             <button onclick="getRemedy('{{ user }}', this)">Get Remedy</button>
             <button class="ghost" onclick="refreshNow()">Refresh now</button>
-            <button class="ghost" onclick="copyRemedy('{{ user }}')">Copy remedy</button>
+            <!-- <button class="ghost" onclick="copyRemedy('{{ user }}')">Copy remedy</button> -->
           </div>
 
           <div id="remedy-{{ user }}">
